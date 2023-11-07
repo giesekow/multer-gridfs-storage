@@ -343,28 +343,32 @@ export class GridFsStorage extends EventEmitter implements StorageEngine {
 			settings,
 		);
 		return new Promise((resolve, reject) => {
+			const writeStream = this.createStream(streamOptions);
+			
 			const emitError = (streamError) => {
 				this.emit('streamError', streamError, streamOptions);
 				reject(streamError);
 			};
 
-			const emitFile = (f) => {
-				const storedFile: GridFile = {
-					id: f._id,
-					filename: f.filename,
-					metadata: f.metadata || null,
-					bucketName: streamOptions.bucketName,
-					chunkSize: f.chunkSize,
-					size: f.length,
-					md5: f.md5,
-					uploadDate: f.uploadDate,
-					contentType: f.contentType,
-				};
-				this.emit('file', storedFile);
-				resolve(storedFile);
+			const emitFile = () => {
+				const oid = writeStream.id;
+				const fileStr = this.db.collection(`${streamOptions.bucketName}.files`).findOne({_id: oid});
+				fileStr.then((f) => {
+						const storedFile: GridFile = {
+							id: f._id,
+							filename: f.filename,
+							metadata: f.metadata || null,
+							bucketName: streamOptions.bucketName,
+							chunkSize: f.chunkSize,
+							size: f.length,
+							md5: f.md5,
+							uploadDate: f.uploadDate,
+							contentType: f.contentType,
+					};
+					this.emit('file', storedFile);
+					resolve(storedFile);
+				});
 			};
-
-			const writeStream = this.createStream(streamOptions);
 
 			// Multer already handles the error event on the readable stream(Busboy).
 			// Invoking the callback with an error will cause file removal and aborting routines to be called twice
